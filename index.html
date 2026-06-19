@@ -119,10 +119,10 @@
 const SUPABASE_URL = "https://aojlqccquqhpnmvqfmfk.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvamxxY2NxdXFocG5tdnFmbWZrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE4OTIwMzAsImV4cCI6MjA5NzQ2ODAzMH0.oP-ZGOBxg9i203VahaBQGc--mdZV-3miUWAZ8B7QaQw";
 
-let supabase = null;
+let supabaseClient = null;
 try {
   if (window.supabase && SUPABASE_URL.startsWith("http") && !SUPABASE_URL.includes("YOUR-PROJECT")) {
-    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   }
 } catch (e) { console.warn("Supabase not configured", e); }
 
@@ -204,16 +204,16 @@ function sectionFor(pageNum){ return SECTIONS.find(s => s.test(pageNum)) || SECT
 
 /* ====================== DATA ====================== */
 async function fetchMatchList(){
-  if (supabase) {
-    const { data, error } = await supabase.from("matches_list").select("*");
+  if (supabaseClient) {
+    const { data, error } = await supabaseClient.from("matches_list").select("*");
     if (error) throw error;
     return data;
   }
   return MOCK_MATCHES.map(({pages, raw_result, ...rest}) => rest);
 }
 async function fetchMatch(id){
-  if (supabase) {
-    const { data, error } = await supabase.from("matches").select("*").eq("id", id).single();
+  if (supabaseClient) {
+    const { data, error } = await supabaseClient.from("matches").select("*").eq("id", id).single();
     if (error) throw error;
     return data;
   }
