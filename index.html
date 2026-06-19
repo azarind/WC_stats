@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>PMSR — World Cup 2026</title>
+<title>Скиньте деняк — World Cup 2026</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -32,6 +32,14 @@
   .topbar .crest{width:8px;height:22px;background:var(--gold);border-radius:1px;}
   .topbar h1{font-size:18px;margin:0;color:var(--text);}
   .topbar .sub{color:var(--text-dim);font-size:11px;margin-left:auto;font-family:'JetBrains Mono',monospace;}
+
+  .search-wrap{margin-bottom:12px;}
+  .search-input{
+    width:100%;background:var(--card);border:1px solid var(--line);border-radius:12px;
+    color:var(--text);font-family:'Inter',sans-serif;font-size:14px;padding:11px 14px;outline:none;
+  }
+  .search-input::placeholder{color:var(--text-dim);}
+  .search-input:focus{border-color:var(--gold);}
 
   /* ---- match list cards ---- */
   .match-card{
@@ -118,6 +126,7 @@
 // row-level security only grants public SELECT (see schema.sql).
 const SUPABASE_URL = "https://aojlqccquqhpnmvqfmfk.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvamxxY2NxdXFocG5tdnFmbWZrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE4OTIwMzAsImV4cCI6MjA5NzQ2ODAzMH0.oP-ZGOBxg9i203VahaBQGc--mdZV-3miUWAZ8B7QaQw";
+
 
 let supabaseClient = null;
 try {
@@ -331,27 +340,51 @@ function renderTopbar(title, sub){
 }
 
 async function showList(){
-  app.innerHTML = renderTopbar("PMSR", "WORLD CUP '26") + `<div id="list" class="loading">Загружаем матчи…</div>`;
+  app.innerHTML = renderTopbar("Скиньте деняк", "WORLD CUP '26") + `
+    <div class="search-wrap">
+      <input id="searchInput" class="search-input" type="text" placeholder="Поиск по команде…" autocomplete="off">
+    </div>
+    <div id="list" class="loading">Загружаем матчи…</div>`;
   try {
     const matches = await fetchMatchList();
     const list = document.getElementById('list');
     if (!matches || !matches.length) { list.className="empty"; list.textContent="Пока нет разобранных отчётов."; return; }
     list.className = "";
-    list.innerHTML = "";
-    matches.forEach(m => {
-      const card = el('div','match-card');
-      card.innerHTML = `
-        <div class="eyebrow"><span class="stage">${m.stage||''}${m.match_number?(' · #'+m.match_number):''}</span><span>${fmtDate(m.match_date)}</span></div>
-        <div class="score-row">
-          <div class="team">${m.home_team_name}</div>
-          <div class="score">${m.home_score ?? '–'}<div class="dash"></div>${m.away_score ?? '–'}</div>
-          <div class="team away">${m.away_team_name}</div>
-        </div>
-        <div class="venue">${m.venue||''}</div>
-      `;
-      card.onclick = () => showDetail(m.id);
-      list.appendChild(card);
+
+    function renderMatches(items){
+      list.innerHTML = "";
+      if (!items.length) { list.className="empty"; list.textContent="Ничего не найдено."; return; }
+      list.className = "";
+      items.forEach(m => {
+        const card = el('div','match-card');
+        card.innerHTML = `
+          <div class="eyebrow"><span class="stage">${m.stage||''}${m.match_number?(' · #'+m.match_number):''}</span><span>${fmtDate(m.match_date)}</span></div>
+          <div class="score-row">
+            <div class="team">${m.home_team_name}</div>
+            <div class="score">${m.home_score ?? '–'}<div class="dash"></div>${m.away_score ?? '–'}</div>
+            <div class="team away">${m.away_team_name}</div>
+          </div>
+          <div class="venue">${m.venue||''}</div>
+        `;
+        card.onclick = () => showDetail(m.id);
+        list.appendChild(card);
+      });
+    }
+
+    renderMatches(matches);
+
+    document.getElementById('searchInput').addEventListener('input', (e) => {
+      const q = e.target.value.trim().toLowerCase();
+      if (!q) { renderMatches(matches); return; }
+      const filtered = matches.filter(m =>
+        (m.home_team_name||'').toLowerCase().includes(q) ||
+        (m.away_team_name||'').toLowerCase().includes(q) ||
+        (m.stage||'').toLowerCase().includes(q) ||
+        (m.venue||'').toLowerCase().includes(q)
+      );
+      renderMatches(filtered);
     });
+    return;
   } catch (e) {
     document.getElementById('list').outerHTML = `<div class="error">Ошибка загрузки: ${e.message||e}</div>`;
   }
