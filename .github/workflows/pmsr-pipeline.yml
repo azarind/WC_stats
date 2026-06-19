@@ -1,0 +1,42 @@
+name: fifa-wc-pmsr-pipeline
+
+on:
+  schedule:
+    # 3x/day UTC — adjust to match World Cup kickoff slots if you want tighter latency
+    - cron: "0 6,14,22 * * *"
+  workflow_dispatch: {}   # lets you trigger it manually from the Actions tab
+
+jobs:
+  run-pipeline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r pipeline/requirements.txt -r requirements-parser.txt
+
+      - name: Restore "seen reports" state
+        uses: actions/cache@v4
+        with:
+          path: pipeline/seen_reports.json
+          key: seen-reports-${{ github.run_id }}
+          restore-keys: seen-reports-
+
+      - name: Run pipeline
+        working-directory: pipeline
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          python pipeline.py \
+            --parser programmatic \
+            --parser-script ../fifa_wc/parse_fifa_report.py \
+            --state seen_reports.json
+
+      # Switch to the prompt-based backend instead by replacing the step above with:
+      #   python pipeline.py --parser prompt --prompt-file ../fifa_wc/parse_fifa_report_prompt.md
