@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>PMSR — World Cup 2026</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0E1410;
+    --card:#161D18;
+    --card-2:#1C241E;
+    --line:#27322B;
+    --gold:#C9A227;
+    --pitch:#2F6B4F;
+    --text:#F3F1E7;
+    --text-dim:#8B9690;
+    --bad:#C9534B;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;}
+  body{padding-bottom:24px;min-height:100vh;}
+  h1,h2,h3,.display{font-family:'Oswald',sans-serif;text-transform:uppercase;letter-spacing:.02em;}
+  .mono{font-family:'JetBrains Mono',monospace;}
+  #app{max-width:520px;margin:0 auto;padding:0 14px;}
+
+  /* ---- top bar ---- */
+  .topbar{display:flex;align-items:center;gap:10px;padding:18px 4px 10px;}
+  .topbar .crest{width:8px;height:22px;background:var(--gold);border-radius:1px;}
+  .topbar h1{font-size:18px;margin:0;color:var(--text);}
+  .topbar .sub{color:var(--text-dim);font-size:11px;margin-left:auto;font-family:'JetBrains Mono',monospace;}
+
+  /* ---- match list cards ---- */
+  .match-card{
+    background:var(--card);border:1px solid var(--line);border-radius:14px;
+    padding:14px 16px;margin-bottom:10px;cursor:pointer;transition:border-color .15s, transform .1s;
+  }
+  .match-card:active{transform:scale(.985);}
+  .match-card:hover{border-color:var(--gold);}
+  .eyebrow{display:flex;justify-content:space-between;color:var(--text-dim);font-size:11px;margin-bottom:10px;font-family:'JetBrains Mono',monospace;}
+  .eyebrow .stage{color:var(--gold);}
+  .score-row{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:10px;}
+  .team{font-size:15px;font-weight:600;}
+  .team.away{text-align:right;}
+  .score{display:flex;align-items:center;gap:8px;font-family:'JetBrains Mono',monospace;font-size:24px;font-weight:600;}
+  .score .dash{width:10px;height:2px;background:var(--line);}
+  .venue{margin-top:8px;color:var(--text-dim);font-size:11px;}
+  .empty,.loading{color:var(--text-dim);text-align:center;padding:60px 10px;font-size:13px;}
+  .error{color:var(--bad);text-align:center;padding:40px 10px;font-size:13px;}
+
+  /* ---- detail screen ---- */
+  .back-btn{
+    display:inline-flex;align-items:center;gap:6px;color:var(--text-dim);font-size:12px;
+    background:none;border:none;padding:14px 0;cursor:pointer;font-family:'JetBrains Mono',monospace;
+  }
+  .back-btn:active{color:var(--gold);}
+  .scoreboard{
+    background:linear-gradient(180deg,var(--card-2),var(--card));
+    border:1px solid var(--line);border-radius:16px;padding:18px 16px;margin-bottom:14px;
+    position:relative;overflow:hidden;
+  }
+  .scoreboard::before{
+    content:"";position:absolute;left:0;right:0;top:50%;height:1px;
+    background:repeating-linear-gradient(90deg,var(--gold) 0 6px,transparent 6px 12px);opacity:.35;
+  }
+  .sb-meta{display:flex;justify-content:space-between;color:var(--text-dim);font-size:11px;font-family:'JetBrains Mono',monospace;margin-bottom:14px;}
+  .sb-meta .stage{color:var(--gold);}
+  .sb-score{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;position:relative;z-index:1;}
+  .sb-team{font-size:16px;font-weight:600;line-height:1.2;}
+  .sb-team.away{text-align:right;}
+  .sb-num{font-family:'JetBrains Mono',monospace;font-size:34px;font-weight:600;text-align:center;}
+  .sb-num span{padding:2px 10px;background:var(--bg);border-radius:6px;}
+  .sb-venue{margin-top:14px;color:var(--text-dim);font-size:11px;position:relative;z-index:1;}
+
+  /* tabs */
+  .tabs{display:flex;gap:6px;overflow-x:auto;padding:4px 0 14px;scrollbar-width:none;}
+  .tabs::-webkit-scrollbar{display:none;}
+  .tab{
+    flex:0 0 auto;padding:8px 13px;border-radius:20px;border:1px solid var(--line);
+    background:var(--card);color:var(--text-dim);font-size:12px;font-weight:500;cursor:pointer;white-space:nowrap;
+  }
+  .tab.active{background:var(--gold);color:#1B1503;border-color:var(--gold);font-weight:600;}
+
+  .section-title{color:var(--text-dim);font-size:11px;text-transform:uppercase;letter-spacing:.08em;margin:18px 4px 8px;font-family:'JetBrains Mono',monospace;}
+  .page-card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:10px;}
+  .page-card h3{font-size:13px;margin:0 0 10px;color:var(--text);}
+
+  .stat-row{display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:10px;padding:6px 0;border-top:1px solid var(--line);font-size:13px;}
+  .stat-row:first-of-type{border-top:none;}
+  .stat-row .label{color:var(--text-dim);text-align:center;}
+  .stat-row .val{font-family:'JetBrains Mono',monospace;font-weight:600;}
+  .stat-row .val.home{text-align:left;}
+  .stat-row .val.away{text-align:right;}
+  .bar-wrap{height:4px;background:var(--line);border-radius:2px;overflow:hidden;display:flex;margin:2px 0 6px;}
+  .bar-home{background:var(--pitch);}
+  .bar-away{background:var(--gold);}
+
+  .kv{display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-top:1px solid var(--line);font-size:12.5px;}
+  .kv:first-child{border-top:none;}
+  .kv .k{color:var(--text-dim);}
+  .kv .v{font-family:'JetBrains Mono',monospace;text-align:right;}
+
+  .note{margin-top:10px;padding:8px 10px;border-left:2px solid var(--gold);background:rgba(201,162,39,.08);color:var(--text-dim);font-size:11px;border-radius:0 6px 6px 0;}
+  .list-item{font-size:12.5px;padding:5px 0;border-top:1px solid var(--line);display:flex;justify-content:space-between;gap:8px;}
+  .list-item:first-child{border-top:none;}
+  .pill{font-size:10px;color:var(--bg);background:var(--text-dim);border-radius:4px;padding:1px 5px;margin-left:6px;}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+/* ====================== CONFIG ====================== */
+// Fill these in with your Supabase project. Anon key is safe to expose —
+// row-level security only grants public SELECT (see schema.sql).
+const SUPABASE_URL = "https://aojlqccquqhpnmvqfmfk.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvamxxY2NxdXFocG5tdnFmbWZrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE4OTIwMzAsImV4cCI6MjA5NzQ2ODAzMH0.oP-ZGOBxg9i203VahaBQGc--mdZV-3miUWAZ8B7QaQw";
+
+let supabase = null;
+try {
+  if (window.supabase && SUPABASE_URL.startsWith("http") && !SUPABASE_URL.includes("YOUR-PROJECT")) {
+    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  }
+} catch (e) { console.warn("Supabase not configured", e); }
+
+// Telegram WebApp niceties (no-ops outside Telegram)
+try { window.Telegram?.WebApp?.ready(); window.Telegram?.WebApp?.expand(); } catch(e){}
+
+/* ====================== MOCK FALLBACK ======================
+   Used only if Supabase isn't configured, so this file is viewable standalone.
+   Mirrors the rows in seed.sql. */
+const MOCK_MATCHES = [
+  {
+    id: "bra-mor-7",
+    home_team_name: "Brazil", away_team_name: "Morocco",
+    home_score: 1, away_score: 1,
+    competition: "FIFA World Cup 2026", stage: "Group C", match_number: 7,
+    match_date: "2026-06-13", kickoff: "19:00", venue: "Estadio Azteca, Mexico City",
+    pages: {
+      "1": { title:"Match Cover", type:"match_summary", data:{ attendance:83200 } },
+      "2": { title:"Lineups", type:"lineups", data:{
+        home_team:{ formation:"4-3-3", goals:[{player:"Vinicius Jr.", minute:34}], cards:[{player:"Casemiro", outcome:"yellow", minute:61}], subs:[{player:"Savinho", minute:70}] },
+        away_team:{ formation:"4-1-4-1", goals:[{player:"Hakimi", minute:78}], cards:[], subs:[{player:"Ben Yedder", minute:65}] }
+      }},
+      "3": { title:"Key Statistics", type:"key_stats", data:{
+        possession:{home:58,away:42}, shots:{home:14,away:9}, shots_on_target:{home:6,away:4},
+        corners:{home:7,away:3}, fouls:{home:10,away:13}, passes:{home:612,away:441}, pass_accuracy:{home:87,away:81}
+      }},
+      "4": { title:"Phases of Play", type:"phases_of_play", data:{
+        home_team:{build_up:24, progression:31, final_third:45},
+        away_team:{build_up:35, progression:33, final_third:32}
+      }},
+      "6": { title:"Line Height & Team Length", type:"in_possession", data:{
+        home_team:{avg_line_height_m:52.3, avg_team_length_m:38.1},
+        away_team:{avg_line_height_m:44.7, avg_team_length_m:41.0}
+      }},
+      "7": { title:"Attempts at Goal", type:"attempts_at_goal", data:{
+        home_team:{ total_shots:14, on_target:6, shot_log:[{player:"Vinicius Jr.", minute:34, outcome:"goal", xg:0.31},{player:"Raphinha", minute:52, outcome:"saved", xg:0.12}] },
+        away_team:{ total_shots:9, on_target:4, shot_log:[{player:"Hakimi", minute:78, outcome:"goal", xg:0.18}] },
+        _note:"Point-cloud shot map has no readable coordinates — only shot_log entries and summary counts are captured."
+      }}
+    }
+  },
+  {
+    id: "arg-esp-58",
+    home_team_name: "Argentina", away_team_name: "Spain",
+    home_score: 2, away_score: 0,
+    competition: "FIFA World Cup 2026", stage: "Quarter-final", match_number: 58,
+    match_date: "2026-07-03", kickoff: "15:00", venue: "SoFi Stadium, Los Angeles",
+    pages: {
+      "1": { title:"Match Cover", type:"match_summary", data:{ attendance:70048 } },
+      "3": { title:"Key Statistics", type:"key_stats", data:{
+        possession:{home:46,away:54}, shots:{home:11,away:15}, shots_on_target:{home:7,away:5},
+        corners:{home:4,away:8}, fouls:{home:12,away:9}, passes:{home:498,away:601}, pass_accuracy:{home:84,away:89}
+      }},
+      "25": { title:"Defensive Actions", type:"out_of_possession", data:{
+        home_team:{tackles:19, interceptions:11, blocks:6, clearances:21},
+        away_team:{tackles:14, interceptions:9, blocks:4, clearances:13}
+      }},
+      "31": { title:"GK Involvement", type:"goalkeeping", data:{
+        home_team:{ player:"E. Martinez", saves:5, goals_conceded:0, distribution_accuracy:71 },
+        away_team:{ player:"Unai Simon", saves:5, goals_conceded:2, distribution_accuracy:83 }
+      }}
+    }
+  }
+];
+
+/* ====================== SECTION MAP ======================
+   README "page coverage" table -> tab groups. Pages are matched by number ranges. */
+const SECTIONS = [
+  { key:"summary",   label:"Сводка",       test:p => p>=1 && p<=4 },
+  { key:"possession",label:"В атаке",      test:p => p>=6 && p<=23 },
+  { key:"defense",   label:"В обороне",    test:p => p>=25 && p<=29 },
+  { key:"gk",        label:"Вратари",      test:p => p>=31 && p<=37 },
+  { key:"setplays",  label:"Стандарты",    test:p => p>=39 && p<=40 },
+  { key:"ind_poss",  label:"Игроки · атака",test:p => p>=42 && p<=45 },
+  { key:"ind_def",   label:"Игроки · оборона",test:p => p>=47 && p<=48 },
+  { key:"ind_phys",  label:"Физика",       test:p => p>=50 && p<=51 },
+];
+function sectionFor(pageNum){ return SECTIONS.find(s => s.test(pageNum)) || SECTIONS[0]; }
+
+/* ====================== DATA ====================== */
+async function fetchMatchList(){
+  if (supabase) {
+    const { data, error } = await supabase.from("matches_list").select("*");
+    if (error) throw error;
+    return data;
+  }
+  return MOCK_MATCHES.map(({pages, raw_result, ...rest}) => rest);
+}
+async function fetchMatch(id){
+  if (supabase) {
+    const { data, error } = await supabase.from("matches").select("*").eq("id", id).single();
+    if (error) throw error;
+    return data;
+  }
+  return MOCK_MATCHES.find(m => String(m.id) === String(id));
+}
+
+/* ====================== RENDER HELPERS ====================== */
+const el = (tag, cls, html) => { const e=document.createElement(tag); if(cls) e.className=cls; if(html!=null) e.innerHTML=html; return e; };
+const fmtDate = d => d ? new Date(d).toLocaleDateString('ru-RU',{day:'2-digit',month:'short',year:'numeric'}) : "";
+
+function renderHomeAwayStat(label, home, away, isPercent){
+  const total = (Number(home)||0) + (Number(away)||0);
+  const homePct = total ? (home/total*100) : 50;
+  const wrap = el('div');
+  wrap.innerHTML = `
+    <div class="stat-row">
+      <div class="val home">${home}${isPercent?'%':''}</div>
+      <div class="label">${label}</div>
+      <div class="val away">${away}${isPercent?'%':''}</div>
+    </div>
+    <div class="bar-wrap"><div class="bar-home" style="width:${homePct}%"></div><div class="bar-away" style="width:${100-homePct}%"></div></div>
+  `;
+  return wrap;
+}
+
+// Generic, schema-agnostic renderer for a page's `data` payload.
+// Tries to recognise common shapes (home_team/away_team pairs, key_stats-like
+// dicts, arrays of objects) and falls back to plain key/value rows.
+function renderPageData(container, data){
+  if (data == null) return;
+  const note = data._note;
+
+  const keys = Object.keys(data).filter(k => k !== "_note");
+  const looksHomeAway = keys.includes("home_team") || (keys.length && keys.every(k => /^(home|away)$/.test(k)));
+
+  if (looksHomeAway && typeof data.home === "object" === false && (data.home_team || data.away_team)) {
+    // shape: { home_team: {...}, away_team: {...} } -> two-column comparison of shared numeric fields
+    const home = data.home_team, away = data.away_team;
+    if (typeof home === "object" && typeof away === "object" && home && away) {
+      const fields = Object.keys(home).filter(k => typeof home[k] !== "object");
+      fields.forEach(f => {
+        if (typeof home[f] === "number" || typeof away[f] === "number") {
+          container.appendChild(renderHomeAwayStat(humanize(f), home[f] ?? 0, away[f] ?? 0));
+        } else {
+          container.appendChild(kvRow(humanize(f) + " (дом)", home[f]));
+          container.appendChild(kvRow(humanize(f) + " (гости)", away[f]));
+        }
+      });
+      // nested arrays (e.g. shot_log) rendered below
+      [["home_team", home], ["away_team", away]].forEach(([side, obj]) => {
+        Object.entries(obj).forEach(([k,v]) => {
+          if (Array.isArray(v) && v.length) renderArrayList(container, `${humanize(k)} — ${side==='home_team'?'дом':'гости'}`, v);
+        });
+      });
+      if (note) addNote(container, note);
+      return;
+    }
+  }
+
+  if (data.home != null && data.away != null && typeof data.home !== "object") {
+    container.appendChild(renderHomeAwayStat("значение", data.home, data.away));
+    if (note) addNote(container, note);
+    return;
+  }
+
+  // {home: {...}, away: {...}} as percent dict, or generic key_stats with {home,away} per metric
+  if (keys.length && keys.every(k => data[k] && typeof data[k] === "object" && ("home" in data[k]) && ("away" in data[k]))) {
+    keys.forEach(k => container.appendChild(renderHomeAwayStat(humanize(k), data[k].home, data[k].away, /percent|accuracy|possession/.test(k))));
+    if (note) addNote(container, note);
+    return;
+  }
+
+  // fallback: flat key/value, recursing into arrays and nested objects
+  keys.forEach(k => {
+    const v = data[k];
+    if (Array.isArray(v)) renderArrayList(container, humanize(k), v);
+    else if (v && typeof v === "object") {
+      container.appendChild(el('div','section-title', humanize(k)));
+      const sub = el('div','page-card');
+      renderPageData(sub, v);
+      container.appendChild(sub);
+    } else {
+      container.appendChild(kvRow(humanize(k), v));
+    }
+  });
+  if (note) addNote(container, note);
+}
+
+function kvRow(k, v){ return el('div','kv', `<span class="k">${k}</span><span class="v">${v ?? '—'}</span>`); }
+function humanize(k){ return String(k).replace(/_/g,' ').replace(/\b\w/g, c => c.toUpperCase()); }
+function addNote(container, text){ container.appendChild(el('div','note', '⚠ ' + text)); }
+
+function renderArrayList(container, label, arr){
+  container.appendChild(el('div','section-title', label));
+  const card = el('div','page-card');
+  arr.slice(0, 20).forEach(item => {
+    if (item && typeof item === "object") {
+      const main = item.player || item.name || Object.values(item)[0];
+      const minute = item.minute != null ? `${item.minute}'` : "";
+      const outcome = item.outcome ? `<span class="pill">${item.outcome}</span>` : "";
+      const extra = item.xg != null ? ` · xG ${item.xg}` : "";
+      card.appendChild(el('div','list-item', `<span>${main}${extra}</span><span>${minute}${outcome}</span>`));
+    } else {
+      card.appendChild(el('div','list-item', `<span>${item}</span>`));
+    }
+  });
+  container.appendChild(card);
+}
+
+/* ====================== SCREENS ====================== */
+const app = document.getElementById('app');
+
+function renderTopbar(title, sub){
+  return `<div class="topbar"><div class="crest"></div><h1>${title}</h1><div class="sub">${sub||''}</div></div>`;
+}
+
+async function showList(){
+  app.innerHTML = renderTopbar("PMSR", "WORLD CUP '26") + `<div id="list" class="loading">Загружаем матчи…</div>`;
+  try {
+    const matches = await fetchMatchList();
+    const list = document.getElementById('list');
+    if (!matches || !matches.length) { list.className="empty"; list.textContent="Пока нет разобранных отчётов."; return; }
+    list.className = "";
+    list.innerHTML = "";
+    matches.forEach(m => {
+      const card = el('div','match-card');
+      card.innerHTML = `
+        <div class="eyebrow"><span class="stage">${m.stage||''}${m.match_number?(' · #'+m.match_number):''}</span><span>${fmtDate(m.match_date)}</span></div>
+        <div class="score-row">
+          <div class="team">${m.home_team_name}</div>
+          <div class="score">${m.home_score ?? '–'}<div class="dash"></div>${m.away_score ?? '–'}</div>
+          <div class="team away">${m.away_team_name}</div>
+        </div>
+        <div class="venue">${m.venue||''}</div>
+      `;
+      card.onclick = () => showDetail(m.id);
+      list.appendChild(card);
+    });
+  } catch (e) {
+    document.getElementById('list').outerHTML = `<div class="error">Ошибка загрузки: ${e.message||e}</div>`;
+  }
+}
+
+async function showDetail(id){
+  app.innerHTML = `<button class="back-btn" onclick="showList()">← Все матчи</button><div class="loading">Загружаем отчёт…</div>`;
+  let m;
+  try { m = await fetchMatch(id); }
+  catch(e){ app.innerHTML += `<div class="error">Ошибка загрузки: ${e.message||e}</div>`; return; }
+  if (!m) { app.innerHTML = `<button class="back-btn" onclick="showList()">← Все матчи</button><div class="empty">Матч не найден.</div>`; return; }
+
+  const pages = m.pages || {};
+  const pageNums = Object.keys(pages).map(Number).sort((a,b)=>a-b);
+  const present = new Set(pageNums.map(sectionFor).map(s=>s.key));
+  const sections = SECTIONS.filter(s => present.has(s.key));
+
+  app.innerHTML = `
+    <button class="back-btn" onclick="showList()">← Все матчи</button>
+    <div class="scoreboard">
+      <div class="sb-meta"><span class="stage">${m.stage||''}${m.match_number?(' · Матч '+m.match_number):''}</span><span>${fmtDate(m.match_date)}${m.kickoff?(' · '+m.kickoff):''}</span></div>
+      <div class="sb-score">
+        <div class="sb-team">${m.home_team_name}</div>
+        <div class="sb-num"><span>${m.home_score ?? '–'} : ${m.away_score ?? '–'}</span></div>
+        <div class="sb-team away">${m.away_team_name}</div>
+      </div>
+      <div class="sb-venue">${m.venue||''}</div>
+    </div>
+    <div class="tabs" id="tabs"></div>
+    <div id="sectionContent"></div>
+  `;
+
+  const tabsEl = document.getElementById('tabs');
+  const contentEl = document.getElementById('sectionContent');
+
+  function renderSection(key){
+    tabsEl.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.key===key));
+    contentEl.innerHTML = "";
+    const nums = pageNums.filter(p => sectionFor(p).key === key);
+    if (!nums.length) { contentEl.innerHTML = `<div class="empty">Нет данных для этого раздела.</div>`; return; }
+    nums.forEach(p => {
+      const page = pages[String(p)];
+      const card = el('div','page-card');
+      card.appendChild(el('h3','', `${page.title || 'Страница ' + p}`));
+      renderPageData(card, page.data || {});
+      contentEl.appendChild(card);
+    });
+  }
+
+  sections.forEach((s,i) => {
+    const tab = el('button','tab' + (i===0?' active':''), s.label);
+    tab.dataset.key = s.key;
+    tab.onclick = () => renderSection(s.key);
+    tabsEl.appendChild(tab);
+  });
+  if (sections.length) renderSection(sections[0].key);
+  else contentEl.innerHTML = `<div class="empty">Отчёт ещё не разобран.</div>`;
+}
+
+window.showList = showList;
+window.showDetail = showDetail;
+showList();
+</script>
+</body>
+</html>
